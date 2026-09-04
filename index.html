@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mapa Interactivo - CBTis 73</title>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: sans-serif; background: #f4f4f4; color: #333; }
+        
+        header { background: #000000; color: white; padding: 1rem; text-align: center; }
+        .container { max-width: 1100px; margin: 1.5rem auto; padding: 0 1rem; }
+        
+        .map-section { background: #ffffff; padding: 1.5rem; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        #mapa_escuela { height: 600px; width: 100%; border-radius: 8px; background: #e5e5e5; }
+        
+        footer { background: #404040; color: #ffffff; text-align: center; padding: 1rem; margin-top: 2rem; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>CBTis 73 - Mapa del Plantel</h1>
+    </header>
+
+    <main class="container">
+        <section class="map-section">
+            <h3>Croquis Interactivo de Instalaciones</h3>
+            <p style="margin-bottom: 10px;">Selecciona cualquier edificio o aula para trazar la ruta por los pasillos:</p>
+            <div id="mapa_escuela"></div>
+        </section>
+    </main>
+
+    <footer>
+        <p>&copy; 2026 Portal Escolar CBTis 73</p>
+    </footer>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <script>
+        // 1. Configuramos el mapa para usar coordenadas simples de la imagen (Flat CRS)
+        const map = L.map('mapa_escuela', {
+            crs: L.CRS.Simple,
+            minZoom: -1,
+            maxZoom: 2
+        });
+
+        // 2. Definimos las dimensiones del croquis (Alto: 1000px, Ancho: 1400px)
+        const bounds = [[0, 0], [1000, 1400]];
+        const image = L.imageOverlay('croquis.png', bounds).addTo(map);
+        map.fitBounds(bounds);
+
+        // 3. Red de pasillos principales del croquis [Y (Alto), X (Ancho)]
+        const pasilloEntrada = [180, 520];
+        const pasilloCentral = [460, 680];
+        const pasilloPlazaCivica = [460, 1050];
+
+        // Diseño de pines de colores
+        function crearIconoColor(colorHex = "#2563eb") {
+            const svgIcon = `
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="26" height="36">
+                    <path fill="${colorHex}" stroke="#FFFFFF" stroke-width="1.5" d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/>
+                    <circle cx="12" cy="9" r="2.5" fill="#FFFFFF"/>
+                </svg>`;
+            return L.divIcon({
+                className: 'custom-pin',
+                html: svgIcon,
+                iconSize: [26, 36],
+                iconAnchor: [13, 36],
+                popupAnchor: [0, -32]
+            });
+        }
+
+        let lineaRutaActiva = null;
+
+        // 4. Función de trazado directo sobre la imagen
+        window.trazarRuta = function(destY, destX) {
+            if (lineaRutaActiva) {
+                map.removeLayer(lineaRutaActiva);
+            }
+
+            // Trazado por los pasillos grises del plano
+            const caminoRuta = [
+                pasilloEntrada,
+                [460, 520],
+                pasilloCentral,
+                [destY > 460 ? destY : 460, destX < 1000 ? destX : 1050],
+                [destY, destX]
+            ];
+
+            lineaRutaActiva = L.polyline(caminoRuta, {
+                color: '#2563eb',
+                weight: 6,
+                opacity: 0.9,
+                dashArray: '8, 8'
+            }).addTo(map);
+
+            map.fitBounds(lineaRutaActiva.getBounds(), { padding: [40, 40] });
+        };
+
+        // 5. Lista de marcadores ubicados exactamente sobre las letras del croquis
+        const marcadores = [
+            { coords: [160, 520], titulo: "Entrada Principal", desc: "Caseta de Vigilancia y Acceso Peatonal", color: "#3b8600" },
+            { coords: [200, 450], titulo: "Edificio A", desc: "Dirección, Servicios Administrativos, Escolares y Orientación", color: "#2563eb" },
+            { coords: [360, 600], titulo: "Edificio H", desc: "Taller de Cómputo II, Soporte y Mantenimiento, A19, A20", color: "#800017" },
+            { coords: [320, 800], titulo: "Edificio F", desc: "Sala de Maestros, Análisis Clínicos y Biología", color: "#800017" },
+            { coords: [600, 600], titulo: "Edificio G", desc: "Taller de Cómputo III y Sanitarios", color: "#2563eb" },
+            { coords: [660, 800], titulo: "Edificio B", desc: "Biblioteca, Audio Visual, Capacitación y Depto. Docentes", color: "#992123" },
+            { coords: [660, 1050], titulo: "Edificio E", desc: "A17, A18 y Consultorio / Prefectura", color: "#800017" },
+            { coords: [560, 1200], titulo: "Edificio Q / SS", desc: "Sanitarios Plaza Cívica", color: "#2563eb" },
+            { coords: [480, 1200], titulo: "Edificio F (Sur)", desc: "Aulas A13, A14, A15, A16", color: "#800017" },
+            { coords: [480, 1320], titulo: "Edificio P", desc: "Aulas A9, A10, A11, A12", color: "#800017" },
+            { coords: [780, 1200], titulo: "Edificio D", desc: "Aulas A1, A2, A3, A4", color: "#800017" },
+            { coords: [720, 1320], titulo: "Edificio C", desc: "Aulas A5, A6, A7, A8 y ConstruyeT", color: "#800017" },
+            { coords: [850, 1000], titulo: "Edificio R", desc: "Laboratorio de Química", color: "#992123" },
+            { coords: [720, 930], titulo: "Edificio K", desc: "Laboratorio de Física, A21 y A22", color: "#992123" },
+            { coords: [900, 850], titulo: "Cafetería", desc: "Área de alimentos y descanso", color: "#3b8600" },
+            { coords: [900, 520], titulo: "Cancha Futbol 7", desc: "Área Deportiva", color: "#3b8600" },
+            { coords: [720, 200], titulo: "Edificio T", desc: "A23, A24, A25, Almacén, Contabilidad y Cómputo I", color: "#800017" },
+            { coords: [460, 320], titulo: "Edificio M", desc: "Taller de Mantenimiento Automotriz", color: "#800017" }
+        ];
+
+        // Agregamos los pines al mapa
+        marcadores.forEach(punto => {
+            L.marker(punto.coords, { icon: crearIconoColor(punto.color) })
+                .addTo(map)
+                .bindPopup(`
+                    <div style="font-family: sans-serif; text-align: center;">
+                        <h4 style="margin: 0 0 5px 0; color: ${punto.color};">${punto.titulo}</h4>
+                        <p style="margin: 0 0 8px 0; font-size: 12px;">${punto.desc}</p>
+                        <button onclick="window.trazarRuta(${punto.coords[0]}, ${punto.coords[1]})" 
+                                style="background:#2563eb; color:white; border:none; padding:6px 10px; border-radius:4px; font-weight:bold; cursor:pointer; width:100%;">
+                            📍 Mostrar ruta
+                        </button>
+                    </div>
+                `);
+        });
+    </script>
+</body>
+</html>
